@@ -12,7 +12,7 @@ namespace Haruka.Arcade.SegAPI {
     /// Class for interacting with SegAPI.
     /// https://github.com/akechi-haruka/segapi
     /// </summary>
-    public class SegatoolsAPI3 {
+    public class SegApi {
 
         /// <summary>
         /// Valid packet ID values.
@@ -118,7 +118,7 @@ namespace Haruka.Arcade.SegAPI {
         /// <param name="deviceid">The device ID. All devices in the same group see each other.</param>
         /// <param name="broadcast">The UDP broadcast address.</param>
         /// <param name="port">The UDP port.</param>
-        public SegatoolsAPI3(byte groupid, byte deviceid, String broadcast = "255.255.255.255", int port = 5364) {
+        public SegApi(byte groupid, byte deviceid, String broadcast = "255.255.255.255", int port = 5364) {
             OnLogMessage?.Invoke("Created group " + groupid + ", device " + deviceid + " with " + broadcast + ":" + port);
             GroupId = groupid;
             DeviceId = deviceid;
