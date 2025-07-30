@@ -1,19 +1,15 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 
 namespace Haruka.Arcade.SegAPI {
-    
     /// <summary>
     /// Class for interacting with SegAPI.
     /// https://github.com/akechi-haruka/segapi
     /// </summary>
     public class SegApi {
-
         /// <summary>
         /// Valid packet ID values.
         /// </summary>
@@ -38,29 +34,29 @@ namespace Haruka.Arcade.SegAPI {
         /// The currently configured group ID.
         /// </summary>
         public byte GroupId { get; }
-        
+
         /// <summary>
         /// The currently configured device ID.
         /// </summary>
         public byte DeviceId { get; }
-        
+
         /// <summary>
         /// The currently configured UDP broadcast address.
         /// </summary>
         public IPAddress BroadcastAddress { get; }
-        
+
         /// <summary>
         /// The currently configured UDP port.
         /// </summary>
         public int Port { get; }
-        
+
         /// <summary>
         /// True if the API listener is running.
         /// </summary>
         public bool Running { get; private set; }
-        
+
         private bool connected;
-        
+
         /// <summary>
         /// True if anything was received on the API listener.
         /// </summary>
@@ -71,41 +67,51 @@ namespace Haruka.Arcade.SegAPI {
                 OnConnectedChange?.Invoke(value);
             }
         }
+
         private readonly UdpClient udp;
+        private readonly IPEndPoint sendEp;
         private Thread thread;
 
         /// <summary>
         /// Fired when a TEST packet is received.
         /// </summary>
         public event Action OnTest;
+
         /// <summary>
         /// Fired when a SERVICE packet is received.
         /// </summary>
         public event Action OnService;
+
         /// <summary>
         /// Fired when a CREDIT packet is received.
         /// </summary>
         public event Action<int> OnCredit;
+
         /// <summary>
         /// Fired when a EXIT_GAME packet is received.
         /// </summary>
         public event Action OnExitGame;
+
         /// <summary>
         /// Fired when the connection status changes.
         /// </summary>
         public event Action<bool> OnConnectedChange;
+
         /// <summary>
         /// Fired when a FeliCa card is received.
         /// </summary>
         public event Action<byte[]> OnFelica;
+
         /// <summary>
         /// Fired when a Aime card is received.
         /// </summary>
         public event Action<byte[]> OnAime;
+
         /// <summary>
         /// Fired when a BLOCK_CARD_READER packet is received.
         /// </summary>
         public event Action<bool> OnCardReaderBlocking;
+
         /// <summary>
         /// Fired when a message should be written to log.
         /// </summary>
@@ -118,12 +124,13 @@ namespace Haruka.Arcade.SegAPI {
         /// <param name="deviceid">The device ID. All devices in the same group see each other.</param>
         /// <param name="broadcast">The UDP broadcast address.</param>
         /// <param name="port">The UDP port.</param>
-        public SegApi(byte groupid, byte deviceid, String broadcast = "255.255.255.255", int port = 5364) {
+        public SegApi(byte groupid, byte deviceid, string broadcast = "255.255.255.255", int port = 5364) {
             OnLogMessage?.Invoke("Created group " + groupid + ", device " + deviceid + " with " + broadcast + ":" + port);
             GroupId = groupid;
             DeviceId = deviceid;
             BroadcastAddress = IPAddress.Parse(broadcast);
             Port = port;
+            sendEp = new IPEndPoint(BroadcastAddress, Port);
             udp = new UdpClient() {
                 EnableBroadcast = true,
                 ExclusiveAddressUse = false
@@ -136,7 +143,10 @@ namespace Haruka.Arcade.SegAPI {
         /// Starts the SegAPI listener. No-op if already started.
         /// </summary>
         public void Start() {
-            if (Running) { return; }
+            if (Running) {
+                return;
+            }
+
             OnLogMessage?.Invoke("Starting device ID " + GroupId);
             Running = true;
             thread = new Thread(StartT) {
@@ -160,10 +170,12 @@ namespace Haruka.Arcade.SegAPI {
                             OnLogMessage?.Invoke("Not our group ID: " + grpid);
                             continue;
                         }
+
                         if (devid == DeviceId) {
                             OnLogMessage?.Invoke("Our own device ID, skipping");
                             continue;
                         }
+
                         byte[] inner = new byte[len];
                         Array.Copy(data, 4, inner, 0, len);
                         Handle((Packet)id, inner, pt);
@@ -174,6 +186,7 @@ namespace Haruka.Arcade.SegAPI {
                     }
                 }
             }
+
             OnLogMessage?.Invoke("Stopped device ID " + GroupId);
             Connected = false;
             Running = false;
@@ -186,7 +199,8 @@ namespace Haruka.Arcade.SegAPI {
             Running = false;
             try {
                 udp?.Close();
-            } catch { }
+            } catch (SocketException) {
+            }
         }
 
         private void Handle(Packet id, byte[] inner, IPEndPoint pt) {
@@ -194,6 +208,7 @@ namespace Haruka.Arcade.SegAPI {
             if (!Connected) {
                 Connected = true;
             }
+
             if (id == Packet.Ping) {
                 Send(pt, Packet.Ack, new byte[] { (byte)id });
             } else if (id == Packet.Ack) {
@@ -208,6 +223,7 @@ namespace Haruka.Arcade.SegAPI {
                 if (inner.Length > 0) {
                     credit = inner[0];
                 }
+
                 OnCredit?.Invoke(credit);
                 Send(pt, Packet.Ack, new byte[] { (byte)id });
             } else if (id == Packet.CardReadFelica) {
@@ -236,29 +252,37 @@ namespace Haruka.Arcade.SegAPI {
             udp.Send(outdata, outdata.Length, pt);
         }
 
-        public void SetVFDMessage(String str) {
+        public void SetVfdMessage(string str) {
             OnLogMessage?.Invoke("VFD: " + str);
-            Send(new IPEndPoint(BroadcastAddress, Port), Packet.VFDTextUTF, Encoding.UTF8.GetBytes(str));
+            Send(sendEp, Packet.VFDTextUTF, Encoding.UTF8.GetBytes(str));
         }
 
         public void SendCredit(uint count) {
-            Send(new IPEndPoint(BroadcastAddress, Port), Packet.Credit, new byte[] { (byte)(int)count });
+            Send(sendEp, Packet.Credit, new byte[] { (byte)(int)count });
         }
 
         public void SetCardReaderStatus(bool v) {
-            Send(new IPEndPoint(BroadcastAddress, Port), Packet.SetCardReaderState, new byte[] { (byte)(v ? 1 : 0) });
+            Send(sendEp, Packet.SetCardReaderState, new byte[] { (byte)(v ? 1 : 0) });
         }
 
         public void SetCardReaderRGB(byte r, byte g, byte b) {
-            Send(new IPEndPoint(BroadcastAddress, Port), Packet.SetCardReaderRGB, new byte[] { r, g, b });
+            Send(sendEp, Packet.SetCardReaderRGB, new byte[] { r, g, b });
         }
 
         public void SendPing() {
-            Send(new IPEndPoint(BroadcastAddress, Port), Packet.Ping, new byte[0]);
+            Send(sendEp, Packet.Ping, new byte[0]);
         }
 
         public void SendExitGame() {
-            Send(new IPEndPoint(BroadcastAddress, Port), Packet.ExitGame, new byte[0]);
+            Send(sendEp, Packet.ExitGame, new byte[0]);
+        }
+
+        public void SendCardReaderState(bool b) {
+            Send(sendEp, Packet.SetCardReaderState, new byte[] { (byte)(b ? 1 : 0) });
+        }
+
+        public void SendCardReaderLed(byte r, byte g, byte b) {
+            Send(sendEp, Packet.SetCardReaderRGB, new byte[] { r, g, b });
         }
     }
 }
