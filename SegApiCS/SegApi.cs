@@ -210,14 +210,14 @@ namespace Haruka.Arcade.SegAPI {
             }
 
             if (id == Packet.Ping) {
-                Send(pt, Packet.Ack, new byte[] { (byte)id });
+                Send(sendEp, Packet.Ack, new byte[] { (byte)id });
             } else if (id == Packet.Ack) {
             } else if (id == Packet.Test) {
                 OnTest?.Invoke();
-                Send(pt, Packet.Ack, new byte[] { (byte)id });
+                Send(sendEp, Packet.Ack, new byte[] { (byte)id });
             } else if (id == Packet.Service) {
                 OnService?.Invoke();
-                Send(pt, Packet.Ack, new byte[] { (byte)id });
+                Send(sendEp, Packet.Ack, new byte[] { (byte)id });
             } else if (id == Packet.Credit) {
                 int credit = 1;
                 if (inner.Length > 0) {
@@ -225,23 +225,24 @@ namespace Haruka.Arcade.SegAPI {
                 }
 
                 OnCredit?.Invoke(credit);
-                Send(pt, Packet.Ack, new byte[] { (byte)id });
+                Send(sendEp, Packet.Ack, new byte[] { (byte)id });
             } else if (id == Packet.CardReadFelica) {
                 OnFelica?.Invoke(inner);
-                Send(pt, Packet.Ack, new byte[] { (byte)id });
+                Send(sendEp, Packet.Ack, new byte[] { (byte)id });
             } else if (id == Packet.CardReadAime) {
                 OnAime?.Invoke(inner);
-                Send(pt, Packet.Ack, new byte[] { (byte)id });
+                Send(sendEp, Packet.Ack, new byte[] { (byte)id });
             } else if (id == Packet.SetCardReaderBlocked) {
                 OnCardReaderBlocking?.Invoke(inner[0] != 0);
-                Send(pt, Packet.Ack, new byte[] { (byte)id });
+                Send(sendEp, Packet.Ack, new byte[] { (byte)id });
             } else if (id == Packet.ExitGame) {
                 OnExitGame?.Invoke();
-                Send(pt, Packet.Ack, new byte[] { (byte)id });
+                Send(sendEp, Packet.Ack, new byte[] { (byte)id });
             }
         }
 
         private void Send(IPEndPoint pt, Packet id, byte[] data) {
+            pt.Port = Port;
             byte[] outdata = new byte[data.Length + 4];
             outdata[0] = (byte)id;
             outdata[1] = GroupId;
